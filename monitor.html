@@ -1,0 +1,140 @@
+<html>
+
+<body onload="setup()">
+
+    <form id="enableAudioButton" action="#" onsubmit="enableAudio()">
+        <input type="submit" value="Click here to enable audio warning." />
+    </form>
+    <form id="frmConnect" action="#" onsubmit="connect(txtIP.value)">
+        <input type="text" placeholder="ip address" id="txtIP" value="192.168.1.120" />
+        <input type="submit" id="btnConnect" value="Connect" />
+    </form>
+
+    <form id="frmSend" action="#" onsubmit="send(txtCmd.value)" hidden>
+        <input type="text" placeholder="command" id="txtCmd" />
+        <input type="submit" value="Send" />
+    </form>
+
+    <div>Extruder Temp:
+        <span id="extruderTemp">0</span> °C
+    </div>
+    <div>Extruder Target Temp:
+        <span id="extruderTargetTemp">0</span> °C
+    </div>
+    <div>Tolerance:
+        <span id="tolerance">0</span> °C
+    </div>
+
+    <textarea cols="60" rows="20" id="txtLog"></textarea>
+
+    <script>
+        var audio = new Audio('alarm.mp3');
+        var ws;
+        var extruderTemp = 0;
+        var extruderTargetTemp = 0;
+        var connected = false;
+        var audioEnabled = false;
+        var tolerance = 10;
+        function connect(ip) {
+            ws = new WebSocket("ws://" + ip + ":81");
+
+            ws.onmessage = function (event) {
+                checkExtruderTemp(event.data);
+            }
+
+            ws.onopen = function () {
+                connected = true;
+                frmConnect.hidden = true;
+                frmSend.hidden = false;
+                txtLog.value += "Connected to " + ip + "\n";
+            }
+        }
+        function enableAudio(event) {
+            audioEnabled = true;
+            enableAudioButton.hidden = true;
+        }
+        function send(cmd) {
+            if (ws) ws.send(cmd);
+            // txtLog.value += "> " + cmd + "\n";
+            txtCmd.select();
+        }
+        function checkExtruderTemp(data) {
+            // txtLog.value += "> " + data + "\n";
+            console.log(data);
+            var initialSearch = " T:";
+            var pos = data.indexOf(initialSearch) + initialSearch.length;
+            if (pos > 1) {
+                var remainderOfString = data.substring(pos);
+                var untilSlash = remainderOfString.indexOf("/");
+                extruderTemp = remainderOfString.substring(0, untilSlash);
+                remainderOfString = remainderOfString.substring(untilSlash + 1);
+                var untilB = remainderOfString.indexOf("B:");
+                extruderTargetTemp = remainderOfString.substring(0, untilB);
+                // txtLog.value += "Temp: " + extruderTemp + '\n';
+                // txtLog.value += "Target Temp: " + extruderTargetTemp + '\n';
+
+            }
+            displayStats();
+            checkLimits();
+        }
+
+        function displayStats() {
+            document.getElementById("extruderTemp").innerHTML = extruderTemp;
+            document.getElementById("extruderTargetTemp").innerHTML = extruderTargetTemp;
+            document.getElementById("tolerance").innerHTML = tolerance;
+        }
+        function isNumeric(n) {
+            return !isNaN(parseFloat(n)) && isFinite(n);
+        }
+        function setup() {
+            connect('192.168.1.120');
+            runTempMonitor();
+            displayStats();
+        }
+
+        function runTempMonitor() {
+            if (connected) send("M105");
+            setTimeout(runTempMonitor, 2500);
+        }
+
+        function checkLimits() {
+            if (!isNumeric(extruderTemp) || !isNumeric(extruderTargetTemp)) {
+                txtLog.value += "WARNING: NON-NUMERIC VALUES!\n";
+                return;
+            }
+            var diff = Math.round(Math.abs(extruderTemp - extruderTargetTemp) * 100) / 100;
+            // txtLog.value += "Diff: "+diff+".\n";
+            if (diff > tolerance) {
+                var date = new Date();
+                txtLog.value += "WARNING: Extruder vs Target Temperature out of tolerance.\nDifference: " + diff + " °C\n" + date.toDateString() + " " + date.toLocaleTimeString() + " " + "\n";
+                playAudio();
+            }
+            else {
+                stopAudio();
+            }
+        }
+
+        async function playAudio() {
+            if (!audioEnabled) return;
+            try {
+                await audio.play();
+            } catch (err) {
+                console.log('audio not enabled, the user has to click a button or something to enable it.')
+            }
+        }
+
+        async function stopAudio() {
+            if (!audioEnabled) return;
+            try {
+                await audio.pause();
+
+            } catch (err) {
+                console.log('audio not enabled, the user has to click a button or something to enable it.')
+            }
+        }
+
+
+    </script>
+</body>
+
+</html>
