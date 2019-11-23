@@ -1,139 +1,100 @@
 <html>
+<script src='monitor.js'></script>
+<style>
+.mdc-button {
+    width: 300px;
+    margin-left: 20px;
+}
+.mdc-text-field {
+    margin-left: 20px;
+}
+</style>
+<body onload="onLoad()">
 
-<body onload="setup()">
+    <!-- Required styles for MDC Web -->
+    <link rel="stylesheet" href="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.css">
 
+    <!-- Render textfield component -->
+
+    <!-- Required MDC Web JavaScript library -->
+    <script src="https://unpkg.com/material-components-web@latest/dist/material-components-web.min.js"></script>
     <form id="enableAudioButton" action="#" onsubmit="enableAudio()">
-        <input type="submit" value="Click here to enable audio warning." />
+        <button class="mdc-button mdc-elevation--z4" type="submit" id="audioWarning" value="Connect">
+            <div class="mdc-button__ripple"></div>
+            <span class="mdc-button__label">Click to enable audio warning.</span>
+        </button>
     </form>
     <form id="frmConnect" action="#" onsubmit="connect(txtIP.value)">
-        <input type="text" placeholder="ip address" id="txtIP" value="192.168.1.120" />
-        <input type="submit" id="btnConnect" value="Connect" />
+        <div class="mdc-text-field" data-mdc-auto-init="MDCTextField">
+            <input type="text" id="txtIP" class="mdc-text-field__input" value="192.168.1.120">
+            <label class="mdc-floating-label" for="txtIP">Printer's IP Address</label>
+            <div class="mdc-line-ripple"></div>
+        </div>
+        <button class="mdc-button mdc-elevation--z4" type="submit" id="btnConnect" value="Connect">
+            <div class="mdc-button__ripple"></div>
+            <span class="mdc-button__label">Connect To Printer</span>
+        </button>
     </form>
 
-    <form id="frmSend" action="#" onsubmit="send(txtCmd.value)" hidden>
-        <input type="text" placeholder="command" id="txtCmd" />
-        <input type="submit" value="Send" />
+    <form id="frmSend" action="#" onsubmit="send(txtCmd.value)">
+        <div class="mdc-text-field" data-mdc-auto-init="MDCTextField">
+            <input type="text" placeholder="G-Code" class="mdc-text-field__input" id="txtCmd" />
+        </div>
+        <button class="mdc-button mdc-elevation--z4 mdc-button-fixed-button" type="submit" id="commandSend" disabled value="Connect">
+            <div class="mdc-button__ripple"></div>
+            <span class="mdc-button__label">Send Command</span>
+        </button>
     </form>
 
-    <div>Extruder Temp:
-        <span id="extruderTemp">0</span> °C
-    </div>
-    <div>Extruder Target Temp:
-        <span id="extruderTargetTemp">0</span> °C
-    </div>
-    <div>Tolerance:
-        <span id="tolerance">0</span> °C
+    <div class="mdc-layout-grid">
+        <div class="mdc-layout-grid__inner">
+            <div class="mdc-layout-grid__cell">
+                <div class="mdc mdc-elevation--z4" id='scroller'
+                    style="width: 600px;  padding: 20px; overflow: scroll; height:251px;">
+                    <span id="txtLog" style="font-family: monospace;"></span>
+                </div>
+            </div>
+            <div class="mdc-layout-grid__cell">
+                <ul class="mdc-list mdc-list--two-line mdc-elevation--z4" style="max-width: 350; height: 275px;">
+                    <li class="mdc-list-item" tabindex="0">
+                        <span class="mdc-list-item__text">
+                            <span class="mdc-list-item__primary-text">
+                                <span id="extruderTemp">0</span> °C
+                            </span>
+                            <span class="mdc-list-item__secondary-text">
+                                Extruder Temp
+                            </span>
+                        </span>
+                    </li>
+                    <li class="mdc-list-item">
+                        <span class="mdc-list-item__text">
+                            <span class="mdc-list-item__primary-text">
+                                <span id="extruderTargetTemp">0</span> °C
+                            </span>
+                            <span class="mdc-list-item__secondary-text">
+                                Extruder Target Temp
+                            </span>
+                        </span>
+                    </li>
+                    <li class="mdc-list-item">
+                        <span class="mdc-list-item__text">
+                            <span class="mdc-list-item__primary-text">
+                                <span id="tolerance">0</span> °C
+                            </span>
+                            <span class="mdc-list-item__secondary-text">
+                                Tolerance
+                            </span>
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
     </div>
 
-    <textarea cols="60" rows="20" id="txtLog"></textarea>
+    <p />
 
     <script>
-        var audio = new Audio('alarm.mp3');
-        var ws;
-        var extruderTemp = 0;
-        var extruderTargetTemp = 0;
-        var connected = false;
-        var audioEnabled = false;
-        var tolerance = 10;
-        function connect(ip) {
-            ws = new WebSocket("ws://" + ip + ":81");
-
-            ws.onmessage = function (event) {
-                checkExtruderTemp(event.data);
-            }
-
-            ws.onopen = function () {
-                connected = true;
-                frmConnect.hidden = true;
-                frmSend.hidden = false;
-                txtLog.value += "Connected to " + ip + "\n";
-            }
-        }
-        function enableAudio(event) {
-            audioEnabled = true;
-            enableAudioButton.hidden = true;
-        }
-        function send(cmd) {
-            if (ws) ws.send(cmd);
-            // txtLog.value += "> " + cmd + "\n";
-            txtCmd.select();
-        }
-        function checkExtruderTemp(data) {
-            // txtLog.value += "> " + data + "\n";
-            console.log(data);
-            var initialSearch = " T:";
-            var pos = data.indexOf(initialSearch) + initialSearch.length;
-            if (pos > 1) {
-                var remainderOfString = data.substring(pos);
-                var untilSlash = remainderOfString.indexOf("/");
-                extruderTemp = remainderOfString.substring(0, untilSlash);
-                remainderOfString = remainderOfString.substring(untilSlash + 1);
-                var untilB = remainderOfString.indexOf("B:");
-                extruderTargetTemp = remainderOfString.substring(0, untilB);
-                // txtLog.value += "Temp: " + extruderTemp + '\n';
-                // txtLog.value += "Target Temp: " + extruderTargetTemp + '\n';
-
-            }
-            displayStats();
-            checkLimits();
-        }
-
-        function displayStats() {
-            document.getElementById("extruderTemp").innerHTML = extruderTemp;
-            document.getElementById("extruderTargetTemp").innerHTML = extruderTargetTemp;
-            document.getElementById("tolerance").innerHTML = tolerance;
-        }
-        function isNumeric(n) {
-            return !isNaN(parseFloat(n)) && isFinite(n);
-        }
-        function setup() {
-            connect('192.168.1.120');
-            runTempMonitor();
-            displayStats();
-        }
-
-        function runTempMonitor() {
-            if (connected) send("M105");
-            setTimeout(runTempMonitor, 2500);
-        }
-
-        function checkLimits() {
-            if (!isNumeric(extruderTemp) || !isNumeric(extruderTargetTemp)) {
-                txtLog.value += "WARNING: NON-NUMERIC VALUES!\n";
-                return;
-            }
-            var diff = Math.round(Math.abs(extruderTemp - extruderTargetTemp) * 100) / 100;
-            // txtLog.value += "Diff: "+diff+".\n";
-            if (diff > tolerance) {
-                var date = new Date();
-                txtLog.value += "WARNING: Extruder vs Target Temperature out of tolerance.\nDifference: " + diff + " °C\n" + date.toDateString() + " " + date.toLocaleTimeString() + " " + "\n";
-                playAudio();
-            }
-            else {
-                stopAudio();
-            }
-        }
-
-        async function playAudio() {
-            if (!audioEnabled) return;
-            try {
-                await audio.play();
-            } catch (err) {
-                console.log('audio not enabled, the user has to click a button or something to enable it.')
-            }
-        }
-
-        async function stopAudio() {
-            if (!audioEnabled) return;
-            try {
-                await audio.pause();
-
-            } catch (err) {
-                console.log('audio not enabled, the user has to click a button or something to enable it.')
-            }
-        }
-
-
+        mdc.autoInit();
     </script>
 </body>
 
