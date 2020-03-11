@@ -22,21 +22,26 @@ function connect(ip) {
 	}
 	uiConnectState('Connecting');
 	onScreenLog("Connecting to: " + ip);
+	console.log('ws connecting')
 	ws = new WebSocket("ws://" + ip + ":81");
 	ws.onmessage = function (event) {
 		checkExtruderTemp(event.data);
+		console.log('ws msg')
 	}
 	ws.onopen = function () {
 		uiConnectState('Disconnect');
 		onScreenLog("Connected to " + ip);
+		console.log('ws open')
 	}
 	ws.onclose = function () {
 		uiConnectState('Connect');
 		onScreenLog("Disconnected from " + ip);
+		console.log('ws close')
 	}
 	ws.onerror = function(event) {
 		// onclose is also called when onerror is fired
 		onScreenLog("WebSocket error observed:", event.data);
+		console.log('ws error')
 	};
 }
 
@@ -70,9 +75,9 @@ function enableAudio(event) {
 }
 
 function send(cmd) {
-	onScreenLog("Command Sent: '" + cmd + "'");
-	if (ws && ws.connected) {
+	if (ws && ws.readyState==1) {
 		ws.send(cmd);
+		onScreenLog("Command Sent: '" + cmd + "'");
 	}
 	txtCmd.select();
 }
@@ -114,11 +119,13 @@ function setup() {
 
 function onLoad() {
 	onScreenLog('3D Printer Audio Warning System Ready')
+	setup()
 }
 
 function runTempMonitor() {
 	if (connected) send("M105");
 	setTimeout(runTempMonitor, 2500);
+	console.log("loop")
 }
 
 function checkLimits() {
