@@ -5,6 +5,7 @@ var extruderTargetTemp = 0;
 var connected = false;
 var audioEnabled = false;
 var tolerance = 10;
+var printComplete = false;
 
 function onScreenLog(text) {
 	var div = document.getElementById('txtLog');
@@ -25,7 +26,7 @@ function connect(ip) {
 	console.log('ws connecting')
 	ws = new WebSocket("ws://" + ip + ":81");
 	ws.onmessage = function (event) {
-		checkExtruderTemp(event.data);
+		formatData(event.data);
 		console.log('ws msg')
 	}
 	ws.onopen = function () {
@@ -77,28 +78,52 @@ function enableAudio(event) {
 function send(cmd) {
 	if (ws && ws.readyState==1) {
 		ws.send(cmd);
-		onScreenLog("Command Sent: '" + cmd + "'");
+		// onScreenLog("Command Sent: '" + cmd + "'");
 	}
 	txtCmd.select();
 }
 
-function checkExtruderTemp(data) {
+function formatData(data) {
 	// onScreenLog("> " + data);
 	console.log(data);
-	var initialSearch = " T:";
-	var pos = data.indexOf(initialSearch) + initialSearch.length;
-	if (pos > 1) {
+	var initialSearch;
+	var pos;
+	var nextDelimiter;
+	
+	// search for end of print string
+	initialSearch = "Done printing file";
+	pos = data.indexOf(initialSearch);
+	if (pos != -1) {
+		printComplete = true;
+		onScreenLog("Print Complete!");
+		return;
+	}
+	
+	// this is looking for this pattern, which is returned while printing:
+	//ok N0 P0 B0 T:200.0 /200.0 B:60.7 /60.0 T0:200.0 /200.0 @:79 B@:52
+	initialSearch = "ok N0 P0 B0 T:";
+	pos = data.indexOf(initialSearch)
+	if (pos != -1) {
+		pos += initialSearch.length;
 		var remainderOfString = data.substring(pos);
-		var untilSlash = remainderOfString.indexOf("/");
-		extruderTemp = remainderOfString.substring(0, untilSlash);
-		remainderOfString = remainderOfString.substring(untilSlash + 1);
-		var untilB = remainderOfString.indexOf("B:");
-		extruderTargetTemp = remainderOfString.substring(0, untilB);
+		nextDelimiter = remainderOfString.indexOf(" ");
+		extruderTemp = remainderOfString.substring(0, nextDelimiter).trim();
+		remainderOfString = remainderOfString.substring(nextDelimiter+2).trim();
+		nextDelimiter = remainderOfString.indexOf(" ");
+		extruderTargetTemp = remainderOfString.substring(0, nextDelimiter).trim();
 		// onScreenLog("Temp: " + extruderTemp);
 		// onScreenLog("Target Temp: " + extruderTargetTemp);
+		displayStats();
+		checkLimits();
 	}
-	displayStats();
-	checkLimits();
+
+	// this seems to come up after printing is complete
+	initialSearch = "ok N0 P15 B15 T:";
+	pos = data.indexOf(initialSearch);
+	if (pos != -1) {
+		console.log("Not Printing")
+	}
+
 }
 
 function displayStats() {
